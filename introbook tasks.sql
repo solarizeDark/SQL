@@ -48,13 +48,13 @@ select fl.actual_departure - fl.scheduled_departure as delay
 	where fl.actual_departure is not null and fl.status in ('Departed', 'Arrived')
 order by dif desc limit 10;
 
-# todo:
+# min, max fligh duration with info about delays group by flights from MSC to SPB
 
 with flights_with_condition as
 (
 	select 
 		
-		fl.flight_no as flno, ap.city as departure, ap.city as arrival,
+		fl.flight_no as flno, ap_d.city as departure, ap_a.city as arrival, fl.scheduled_departure as sch_d,
 
 		case when fl.actual_departure is not null then fl.actual_departure
 		else fl.scheduled_departure
@@ -65,10 +65,15 @@ with flights_with_condition as
 		end as atime
 
 	from flights fl
-	join airports ap on fl.arrival_airport = ap.airport_code
-	where departure = 'Москва' AND arrival = 'Санкт-Петербург'
+	join airports ap_d on fl.departure_airport = ap_d.airport_code
+	join airports ap_a on fl.arrival_airport = ap_a.airport_code
+	where ap_d.city = 'Москва' AND ap_a.city = 'Санкт-Петербург'
 )
 
-select min(fl.atime - fl.dtime) as "min duration", 
-		max(fl.atime - fl.dtime) as "max duration"
-	from flights_with_condition fl group by fl.flno; 
+select flno, min(fl.atime - fl.dtime) as "min duration", 
+			max(fl.atime - fl.dtime) as "max duration", 
+			sum(case when (dtime - fl.sch_d) > INTERVAL '1 hour' then 1 else 0 end) as delay,
+			sum(case when (dtime - fl.sch_d) < INTERVAL '1 hour' then 1 else 0 end) as "in_time"
+	from flights_with_condition fl group by fl.flno;
+
+
